@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-white text-black;
+  }
+  
+  /* Отступ для заголовков */
+  h1, h2, .page-title {
+    @apply mt-6 pt-4;
+  }
+}
+
+/* Добавляем отступы для мобильных устройств */
+@media (max-width: 768px) {
+  body, html {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  
+  main {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  
+  /* Увеличенный отступ сверху для заголовков на мобильных */
+  h1, h2, .page-title {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+  }
+}
+
+/* Специфичные отступы для очень маленьких экранов */
+@media (max-width: 480px) {
+  body, html {
+    padding-top: 8px;
+  }
+  
+  main {
+    padding-top: 8px;
+  }
+  
+  /* Больший отступ сверху для заголовков на мобильных */
+  h1, h2, .page-title {
+    margin-top: 2rem;
+    padding-top: 1rem;
+  }
+}
