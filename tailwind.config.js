@@ -1,6 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  purge: false, // We'll handle this through PurgeCSS separately if needed
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
   theme: {
     container: {
       center: true,
@@ -102,12 +106,5 @@ module.exports = {
       },
     },
   },
-  variants: {
-    backgroundColor: ['hover', 'focus'],
-    borderColor: ['hover', 'focus'],
-    boxShadow: ['hover', 'focus'],
-    textColor: ['responsive', 'hover', 'focus'],
-    opacity: ['disabled'],
-  },
-  plugins: [],
+  plugins: [require("tailwindcss-animate")],
 }
