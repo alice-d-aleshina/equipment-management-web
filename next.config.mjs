@@ -28,6 +28,15 @@ const nextConfig = {
     }
     return config
   },
+  // Add rewrites to handle the root path
+  async rewrites() {
+    return [
+      {
+        source: '/',
+        destination: '/equipment',
+      },
+    ]
+  },
 }
 
 mergeConfig(nextConfig, userConfig)
