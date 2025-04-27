@@ -33,12 +33,8 @@ const nextConfig = {
     return [
       {
         source: '/',
-        destination: '/(dashboard)/equipment',
-      },
-      {
-        source: '/equipment',
-        destination: '/(dashboard)/equipment',
-      },
+        destination: '/equipment',
+      }
     ]
   },
 }
