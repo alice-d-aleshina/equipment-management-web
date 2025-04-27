@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import CardReaderService from '../../../server/services/card-reader-service';
+import CardReaderService from '../../../lib/services/card-reader-service';
 
 // Singleton instance of the card reader service
 let cardReaderService;
