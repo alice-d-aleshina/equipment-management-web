@@ -1,14 +1,24 @@
+import React, { useState, useEffect } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { CheckCircle, XCircle, Search, Filter, UserPlus, X, CreditCard, Trash2 } from "lucide-react"
+import { CheckCircle, XCircle, Search, Filter, UserPlus, X, CreditCard, Trash2, AlertCircle } from "lucide-react"
 import type { Student } from "@/lib/types"
-import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// Add Dialog imports
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 // Add Student Panel Component
 const AddStudentPanel = ({ 
@@ -128,11 +138,57 @@ const AddStudentPanel = ({
   );
 };
 
+// Add DeleteConfirmDialog component below AddStudentPanel
+const DeleteConfirmDialog = ({ 
+  isOpen,
+  onClose,
+  onConfirm,
+  studentName,
+  equipmentList,
+}: { 
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  studentName: string;
+  equipmentList: string[];
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center text-red-600">
+            <AlertCircle className="h-5 w-5 mr-2" />
+            Невозможно удалить студента
+          </DialogTitle>
+          <DialogDescription>
+            Студент <span className="font-medium">{studentName}</span> не может быть удален, так как у него есть выданное оборудование.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <h3 className="text-sm font-medium mb-2">Сначала необходимо вернуть:</h3>
+          <ul className="bg-gray-50 p-3 rounded-md border border-gray-200">
+            {equipmentList.map((item, index) => (
+              <li key={index} className="text-sm py-1 pl-2 border-l-2 border-red-400">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Закрыть
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 interface StudentsListProps {
   students: Student[]
   onToggleAccess: (studentId: string) => void
   onAddStudent?: (student: Omit<Student, "id">) => void
-  onDeleteStudent?: (studentId: string) => void
+  onDeleteStudent?: (studentId: string) => Promise<{canDelete: boolean, equipment?: string[]}>
   scannedCardId?: string
 }
 
@@ -143,6 +199,14 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
   const [searchQuery, setSearchQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState<string>('all');
   const [studentsWithVerification, setStudentsWithVerification] = useState<(Student & { cardVerified: boolean })[]>([]);
+  
+  // Add new state for delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<{id: string; name: string; equipment: string[]}>({
+    id: '',
+    name: '',
+    equipment: []
+  });
 
   // Get unique groups from students
   const studentGroups = ['all', ...Array.from(new Set(students.map(student => student.group)))];
@@ -187,6 +251,28 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
     
     return matchesAccess && matchesSearch && matchesGroup;
   });
+
+  // Fix handleDeleteClick function
+  const handleDeleteClick = async (student: Student) => {
+    if (!onDeleteStudent) return;
+    
+    try {
+      // Call the onDeleteStudent function to check if student has equipment
+      const result = await onDeleteStudent(student.id);
+      
+      // If student has equipment, show our dialog
+      if (!result.canDelete && result.equipment && result.equipment.length > 0) {
+        setStudentToDelete({
+          id: student.id,
+          name: student.name,
+          equipment: result.equipment
+        });
+        setDeleteDialogOpen(true);
+      }
+    } catch (error) {
+      console.error("Error checking student equipment:", error);
+    }
+  };
 
   // Mobile view
   if (showMobileView) {
@@ -329,11 +415,7 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
                         variant="ghost"
                         size="sm"
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
-                        onClick={() => {
-                          if (window.confirm('Вы уверены, что хотите удалить этого студента?')) {
-                            onDeleteStudent(student.id);
-                          }
-                        }}
+                        onClick={() => handleDeleteClick(student)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -351,6 +433,15 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
             onAddStudent={handleAddStudent}
           />
         )}
+
+        {/* Add delete confirmation dialog */}
+        <DeleteConfirmDialog
+          isOpen={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={() => setDeleteDialogOpen(false)}
+          studentName={studentToDelete.name}
+          equipmentList={studentToDelete.equipment}
+        />
       </div>
     );
   }
@@ -496,11 +587,7 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
                         size="sm"
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
                         title="Удалить студента"
-                        onClick={() => {
-                          if (window.confirm('Вы уверены, что хотите удалить этого студента?')) {
-                            onDeleteStudent(student.id);
-                          }
-                        }}
+                        onClick={() => handleDeleteClick(student)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -519,6 +606,15 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
           onAddStudent={handleAddStudent}
         />
       )}
+
+      {/* Add delete confirmation dialog */}
+      <DeleteConfirmDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={() => setDeleteDialogOpen(false)}
+        studentName={studentToDelete.name}
+        equipmentList={studentToDelete.equipment}
+      />
     </div>
   );
 }

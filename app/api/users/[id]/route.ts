@@ -129,12 +129,29 @@ export async function DELETE(
     }
     
     // Check if user exists
+    let user;
     try {
-      await getUserById(userId);
+      user = await getUserById(userId);
     } catch (error) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
+      );
+    }
+    
+    // First, check if the user has any equipment checked out
+    const equipment = await getUserEquipment(userId);
+    
+    if (equipment && equipment.length > 0) {
+      return NextResponse.json(
+        { 
+          error: 'Cannot delete user who has equipment checked out',
+          equipment: equipment.map(item => ({
+            id: item.id,
+            name: item.name
+          }))
+        },
+        { status: 400 }
       );
     }
     
@@ -144,16 +161,8 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Error deleting user:', error);
     
-    // Special error message for user with equipment
-    if (error.message.includes('equipment checked out')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
-    }
-    
     return NextResponse.json(
-      { error: 'Failed to delete user' },
+      { error: error.message || 'Failed to delete user' },
       { status: 500 }
     );
   }

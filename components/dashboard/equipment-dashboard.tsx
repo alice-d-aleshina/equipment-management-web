@@ -1,5 +1,5 @@
 "use client"
-
+import React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -575,14 +575,75 @@ export default function EquipmentDashboard() {
     }
   }
 
-  const handleDeleteStudent = async (studentId: string) => {
+  const handleDeleteStudent = async (studentId: string): Promise<{canDelete: boolean, equipment?: string[]}> => {
     try {
+      // First, check if the student has equipment checked out by looking at equipment state
+      const studentEquipment = equipment.filter(e => e.checkedOutBy === studentId);
+      
+      // If student has equipment, we'll show a dialog from the StudentsList component
+      // The actual deletion will still be handled by this function when called again
+      if (studentEquipment.length > 0) {
+        // We'll let the StudentsList component handle showing the dialog
+        // It will call this function again after showing the dialog
+        return {
+          canDelete: false,
+          equipment: studentEquipment.map(e => e.name)
+        };
+      }
+      
+      // If we get here, student has no equipment or user has confirmed deletion
       const response = await fetch(`/api/users/${studentId}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
         const errorData = await response.json();
+        
+        // If the error is about equipment checked out
+        if (errorData.error && errorData.error.includes('equipment checked out')) {
+          // Find the student's name
+          const student = students.find(s => s.id === studentId);
+          const studentName = student ? student.name : 'Студент';
+          
+          // If the API returned equipment details
+          if (errorData.equipment && Array.isArray(errorData.equipment) && errorData.equipment.length > 0) {
+            // Create a message with the list of equipment
+            const equipmentList = errorData.equipment.map(e => e.name);
+            addNotification(
+              `Невозможно удалить ${studentName}. Сначала верните оборудование: ${equipmentList.join(', ')}`, 
+              "error",
+              { important: true }
+            );
+            return { 
+              canDelete: false,
+              equipment: equipmentList
+            };
+          } else {
+            // Fallback to checking equipment locally
+            const checkedOutEquipment = equipment.filter(e => e.checkedOutBy === studentId);
+            
+            if (checkedOutEquipment.length > 0) {
+              const equipmentList = checkedOutEquipment.map(e => e.name);
+              addNotification(
+                `Невозможно удалить ${studentName}. Сначала верните оборудование: ${equipmentList.join(', ')}`, 
+                "error",
+                { important: true }
+              );
+              return { 
+                canDelete: false,
+                equipment: equipmentList
+              };
+            } else {
+              addNotification(
+                `Невозможно удалить ${studentName}, у которого есть выданное оборудование`,
+                "error",
+                { important: true }
+              );
+              return { canDelete: false };
+            }
+          }
+        }
+        
         throw new Error(errorData.error || 'Failed to delete student');
       }
 
@@ -590,15 +651,11 @@ export default function EquipmentDashboard() {
       setStudents(prev => prev.filter(student => student.id !== studentId));
       
       addNotification("Студент успешно удален", "success");
+      return { canDelete: true };
     } catch (error: any) {
       console.error('Error deleting student:', error);
-      
-      // Check for specific error messages
-      if (error.message.includes('equipment checked out')) {
-        addNotification("Невозможно удалить студента, у которого есть выданное оборудование", "error");
-      } else {
-        addNotification("Ошибка при удалении студента", "error");
-      }
+      addNotification("Ошибка при удалении студента", "error");
+      return { canDelete: false };
     }
   }
 

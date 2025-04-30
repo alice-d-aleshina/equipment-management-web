@@ -4,6 +4,7 @@ export interface Notification {
   type: "success" | "error" | "info"
   timestamp: Date
   read: boolean
+  important?: boolean
 }
 
 export interface Request {
