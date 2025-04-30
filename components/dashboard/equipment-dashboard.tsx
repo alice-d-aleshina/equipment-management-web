@@ -575,6 +575,33 @@ export default function EquipmentDashboard() {
     }
   }
 
+  const handleDeleteStudent = async (studentId: string) => {
+    try {
+      const response = await fetch(`/api/users/${studentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete student');
+      }
+
+      // Update local state
+      setStudents(prev => prev.filter(student => student.id !== studentId));
+      
+      addNotification("Студент успешно удален", "success");
+    } catch (error: any) {
+      console.error('Error deleting student:', error);
+      
+      // Check for specific error messages
+      if (error.message.includes('equipment checked out')) {
+        addNotification("Невозможно удалить студента, у которого есть выданное оборудование", "error");
+      } else {
+        addNotification("Ошибка при удалении студента", "error");
+      }
+    }
+  }
+
   const startScanning = () => {
     setScanning(true);
   };
@@ -638,6 +665,7 @@ export default function EquipmentDashboard() {
                     students={students}
                     onToggleAccess={toggleStudentAccess}
                     onAddStudent={handleAddStudent}
+                    onDeleteStudent={handleDeleteStudent}
                     scannedCardId={lastScannedCardId}
                   />
                 )}

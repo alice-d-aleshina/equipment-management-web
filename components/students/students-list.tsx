@@ -1,11 +1,11 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { CheckCircle, XCircle, Search, Filter, UserPlus, X, CreditCard } from "lucide-react"
+import { CheckCircle, XCircle, Search, Filter, UserPlus, X, CreditCard, Trash2 } from "lucide-react"
 import type { Student } from "@/lib/types"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Avatar } from "@/components/ui/avatar"
+import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -132,10 +132,11 @@ interface StudentsListProps {
   students: Student[]
   onToggleAccess: (studentId: string) => void
   onAddStudent?: (student: Omit<Student, "id">) => void
+  onDeleteStudent?: (studentId: string) => void
   scannedCardId?: string
 }
 
-export default function StudentsList({ students, onToggleAccess, onAddStudent, scannedCardId }: StudentsListProps) {
+export default function StudentsList({ students, onToggleAccess, onAddStudent, onDeleteStudent, scannedCardId }: StudentsListProps) {
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
   const [filterAccess, setFilterAccess] = useState<'all' | 'granted' | 'denied'>('all');
   const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
@@ -294,43 +295,49 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, s
         ) : (
           <div className="divide-y divide-gray-100">
             {filteredStudents.map((student) => (
-              <div key={student.id} className="p-3">
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
-                    {student.name.charAt(0)}
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-gray-900 truncate">{student.name}</p>
-                      <Badge className={`${student.hasAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} rounded-xl`}>
-                        {student.hasAccess ? "Разрешено" : "Запрещено"}
-                      </Badge>
+              <div key={student.id} className="bg-white border border-gray-200 rounded-xl mb-3 overflow-hidden">
+                <div className="p-4 relative">
+                  {student.cardVerified && (
+                    <div className="absolute top-3 right-3">
+                      <Badge className="bg-blue-100 text-blue-800 px-2 py-1 text-xs">Карта проверена</Badge>
                     </div>
-                    <div className="mt-1 text-sm text-gray-500">
-                      <p>ID: {student.id}</p>
-                      <p>Группа: {student.group}</p>
-                      <div className="flex items-center mt-1">
-                        <CreditCard className="h-3 w-3 mr-1" />
-                        {student.cardVerified 
-                          ? <span className="text-green-600 flex items-center"><CheckCircle className="h-3 w-3 mr-1" /> Верифицирована</span>
-                          : <span className="text-red-600 flex items-center"><XCircle className="h-3 w-3 mr-1" /> Не верифицирована</span>
-                        }
-                      </div>
+                  )}
+                  <div className="flex items-center mb-3">
+                    <Avatar className="h-9 w-9 mr-3">
+                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(student.name)}`} />
+                    </Avatar>
+                    <div>
+                      <h3 className="font-medium text-gray-900">{student.name}</h3>
+                      <p className="text-sm text-gray-500">Группа: {student.group}</p>
                     </div>
-                    <div className="mt-3">
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={student.hasAccess}
+                        onCheckedChange={() => onToggleAccess(student.id)}
+                        className={student.hasAccess ? "bg-green-600" : "bg-gray-200"}
+                      />
+                      <span className={`text-sm ${student.hasAccess ? "text-green-600" : "text-gray-500"}`}>
+                        {student.hasAccess ? "Доступ разрешен" : "Доступ запрещен"}
+                      </span>
+                    </div>
+                    
+                    {onDeleteStudent && (
                       <Button
+                        variant="ghost"
                         size="sm"
-                        variant="outline"
-                        className={`w-full ${
-                          student.hasAccess 
-                            ? 'border-red-200 text-red-600 hover:bg-red-50 rounded-xl' 
-                            : 'border-green-200 text-green-600 hover:bg-green-50 rounded-xl'
-                        }`}
-                        onClick={() => onToggleAccess(student.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                        onClick={() => {
+                          if (window.confirm('Вы уверены, что хотите удалить этого студента?')) {
+                            onDeleteStudent(student.id);
+                          }
+                        }}
                       >
-                        {student.hasAccess ? "Запретить" : "Разрешить"}
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -446,64 +453,59 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, s
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ФИО</TableHead>
-              <TableHead>ID</TableHead>
-              <TableHead>Группа</TableHead>
-              <TableHead className="text-center">Статус доступа</TableHead>
-              <TableHead className="text-center">Карта</TableHead>
-              <TableHead className="text-center">Действия</TableHead>
+              <TableHead className="bg-white">Имя</TableHead>
+              <TableHead className="bg-white">Группа</TableHead>
+              <TableHead className="bg-white">ID карты</TableHead>
+              <TableHead className="bg-white">Доступ</TableHead>
+              <TableHead className="bg-white text-right">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredStudents.map((student) => (
               <TableRow key={student.id}>
-                <TableCell className="font-medium flex items-center gap-2">
-                  <Avatar className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
-                    {student.name.charAt(0)}
-                  </Avatar>
-                  <span>{student.name}</span>
+                <TableCell className="font-medium">
+                  <div className="flex items-center">
+                    <Avatar className="h-8 w-8 mr-2">
+                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(student.name)}`} />
+                    </Avatar>
+                    {student.name}
+                    {student.cardVerified && (
+                      <Badge className="ml-2 bg-blue-100 text-blue-800">ID проверен</Badge>
+                    )}
+                  </div>
                 </TableCell>
-                <TableCell>{student.id}</TableCell>
                 <TableCell>{student.group}</TableCell>
-                <TableCell className="text-center">
-                  <Badge className={`inline-flex items-center ${
-                    student.hasAccess 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {student.hasAccess 
-                      ? <CheckCircle className="mr-1 h-3 w-3" /> 
-                      : <XCircle className="mr-1 h-3 w-3" />
-                    }
-                    {student.hasAccess ? "Разрешено" : "Запрещено"}
-                  </Badge>
+                <TableCell>{student.card_id || "—"}</TableCell>
+                <TableCell>
+                  <div className="flex items-center">
+                    <Switch
+                      checked={student.hasAccess}
+                      onCheckedChange={() => onToggleAccess(student.id)}
+                      className={student.hasAccess ? "bg-green-600" : "bg-gray-200"}
+                    />
+                    <span className={`ml-2 ${student.hasAccess ? "text-green-600" : "text-gray-500"}`}>
+                      {student.hasAccess ? "Разрешен" : "Запрещен"}
+                    </span>
+                  </div>
                 </TableCell>
-                <TableCell className="text-center">
-                  <Badge className={`inline-flex items-center ${
-                    student.cardVerified
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {student.cardVerified
-                      ? <CheckCircle className="mr-1 h-3 w-3" /> 
-                      : <XCircle className="mr-1 h-3 w-3" />
-                    }
-                    {student.cardVerified ? "Верифицирована" : "Не верифицирована"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={`${
-                      student.hasAccess 
-                        ? 'border-red-200 text-red-600 hover:bg-red-50' 
-                        : 'border-green-200 text-green-600 hover:bg-green-50'
-                    }`}
-                    onClick={() => onToggleAccess(student.id)}
-                  >
-                    {student.hasAccess ? "Запретить доступ" : "Разрешить доступ"}
-                  </Button>
+                <TableCell className="text-right">
+                  <div className="flex justify-end">
+                    {onDeleteStudent && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                        title="Удалить студента"
+                        onClick={() => {
+                          if (window.confirm('Вы уверены, что хотите удалить этого студента?')) {
+                            onDeleteStudent(student.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

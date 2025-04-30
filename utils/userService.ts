@@ -154,4 +154,27 @@ export async function getUserEquipment(userId: number) {
   }
   
   return data;
+}
+
+/**
+ * Delete a user by ID
+ */
+export async function deleteUser(userId: number) {
+  // First, check if the user has any equipment checked out
+  const equipment = await getUserEquipment(userId);
+  
+  if (equipment && equipment.length > 0) {
+    throw new Error('Cannot delete user who has equipment checked out');
+  }
+  
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', userId);
+  
+  if (error) {
+    throw new Error(`Error deleting user: ${error.message}`);
+  }
+  
+  return true;
 } 

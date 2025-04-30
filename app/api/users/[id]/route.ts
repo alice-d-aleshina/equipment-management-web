@@ -4,7 +4,8 @@ import {
   updateUser,
   grantAccess,
   revokeAccess,
-  getUserEquipment
+  getUserEquipment,
+  deleteUser
 } from '../../../../utils/userService';
 import { mapUserToStudent, mapEquipmentToFrontend } from '../../../../lib/api';
 
@@ -107,5 +108,53 @@ export async function POST(
   } catch (error) {
     console.error('Error with user access:', error);
     return NextResponse.json({ error: 'Failed to update user access' }, { status: 500 });
+  }
+}
+
+// DELETE /api/users/[id] - delete a user
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const { id } = await params;
+  
+  try {
+    const userId = parseInt(id);
+    
+    if (isNaN(userId)) {
+      return NextResponse.json(
+        { error: 'Invalid user ID' },
+        { status: 400 }
+      );
+    }
+    
+    // Check if user exists
+    try {
+      await getUserById(userId);
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+    
+    await deleteUser(userId);
+    
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting user:', error);
+    
+    // Special error message for user with equipment
+    if (error.message.includes('equipment checked out')) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Failed to delete user' },
+      { status: 500 }
+    );
   }
 } 
