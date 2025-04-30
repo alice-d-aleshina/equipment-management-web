@@ -671,8 +671,8 @@ export default function EquipmentDashboard() {
           <p className="text-gray-500 mt-1 sm:mt-2">Учет, отслеживание и управление доступом</p>
         </header>
 
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
-          <div className="w-full lg:w-3/4">
+        <div className="flex flex-col">
+          <div className="w-full">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-3 sm:px-6 pt-3 sm:pt-6">
                 <div className="flex w-full gap-2 sm:gap-4 mb-4 sm:mb-6">
@@ -726,24 +726,6 @@ export default function EquipmentDashboard() {
                     scannedCardId={lastScannedCardId}
                   />
                 )}
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full lg:w-1/4">
-            <div className="sticky top-6">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4 sm:p-6 border-b border-gray-100">
-                  <h2 className="text-lg font-semibold text-gray-800">Уведомления</h2>
-                  <p className="text-sm text-gray-500 mt-1">Недавняя активность</p>
-                </div>
-                <div className="p-0">
-                  <div className="flex flex-col items-center justify-center py-10 px-4 text-gray-500 h-[300px]">
-                    <BellOff className="h-12 w-12 mb-4 text-gray-300" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-1">Настроена панель уведомлений</h3>
-                    <p className="text-sm text-center">Смотрите уведомления в правом верхнем углу экрана</p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
