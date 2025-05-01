@@ -663,6 +663,39 @@ export default function EquipmentDashboard() {
     setScanning(true);
   };
 
+  // Add a new function to handle binding card to student
+  const handleBindCard = async (studentId: string, cardId: string) => {
+    try {
+      const response = await fetch(`/api/users/${studentId}?action=bindCard`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ cardId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to bind card to student');
+      }
+
+      const updatedStudent = await response.json();
+      
+      // Update local state
+      setStudents(prev => 
+        prev.map(s => s.id === studentId ? updatedStudent : s)
+      );
+
+      const student = students.find((s) => s.id === studentId);
+      
+      if (student) {
+        addNotification(`Карта успешно привязана к студенту ${student.name}`, "success");
+      }
+    } catch (error) {
+      console.error('Error binding card to student:', error);
+      addNotification("Ошибка при привязке карты к студенту", "error");
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto py-4 sm:py-6 px-3 sm:px-4">
@@ -724,6 +757,7 @@ export default function EquipmentDashboard() {
                     onAddStudent={handleAddStudent}
                     onDeleteStudent={handleDeleteStudent}
                     scannedCardId={lastScannedCardId}
+                    onBindCard={handleBindCard}
                   />
                 )}
               </div>

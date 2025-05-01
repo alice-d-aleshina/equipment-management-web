@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { CheckCircle, XCircle, Search, Filter, UserPlus, X, CreditCard, Trash2, AlertCircle } from "lucide-react"
+import { CheckCircle, XCircle, Search, Filter, UserPlus, X, CreditCard, Trash2, AlertCircle, LinkIcon } from "lucide-react"
 import type { Student } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
@@ -19,6 +19,145 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+
+// Add CardBindingDialog component
+const CardBindingDialog = ({ 
+  isOpen,
+  onClose,
+  onBind,
+  students,
+  scannedCardId,
+}: { 
+  isOpen: boolean;
+  onClose: () => void;
+  onBind: (studentId: string, cardId: string) => void;
+  students: Student[];
+  scannedCardId?: string;
+}) => {
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [isWaitingForScan, setIsWaitingForScan] = useState(false);
+  const [manualCardId, setManualCardId] = useState("");
+
+  // Reset state when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedStudentId("");
+      setIsWaitingForScan(false);
+      setManualCardId("");
+    }
+  }, [isOpen]);
+
+  // When a card is scanned while waiting for scan, bind it
+  useEffect(() => {
+    if (isWaitingForScan && scannedCardId && selectedStudentId) {
+      onBind(selectedStudentId, scannedCardId);
+      setIsWaitingForScan(false);
+      onClose();
+    }
+  }, [scannedCardId, isWaitingForScan, selectedStudentId, onBind, onClose]);
+
+  const handleStartScan = () => {
+    setIsWaitingForScan(true);
+  };
+
+  const handleManualBind = () => {
+    if (selectedStudentId && manualCardId) {
+      onBind(selectedStudentId, manualCardId);
+      onClose();
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center text-blue-600">
+            <LinkIcon className="h-5 w-5 mr-2" />
+            Привязка карты к студенту
+          </DialogTitle>
+          <DialogDescription>
+            Выберите студента и отсканируйте карту для привязки или введите ID карты вручную.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="student">Выберите студента</Label>
+            <Select 
+              value={selectedStudentId} 
+              onValueChange={setSelectedStudentId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите студента" />
+              </SelectTrigger>
+              <SelectContent>
+                {students.map((student) => (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.name} ({student.group})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {isWaitingForScan ? (
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-md border border-blue-200 text-center">
+                <CreditCard className="h-12 w-12 mx-auto text-blue-500 mb-2" />
+                <p className="text-blue-700 font-medium">Ожидание сканирования карты...</p>
+                {scannedCardId && <p className="mt-2 text-green-600">Карта отсканирована: {scannedCardId}</p>}
+              </div>
+              <Button variant="outline" className="w-full" onClick={() => setIsWaitingForScan(false)}>
+                Отменить сканирование
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="cardId">ID карты (вручную)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="cardId"
+                    value={manualCardId}
+                    onChange={(e) => setManualCardId(e.target.value)}
+                    placeholder="Введите ID карты вручную"
+                    className="flex-1"
+                  />
+                  <Button 
+                    variant="outline"
+                    onClick={handleManualBind}
+                    disabled={!selectedStudentId || !manualCardId}
+                  >
+                    Привязать
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center">
+                <div className="flex-grow h-px bg-gray-200"></div>
+                <span className="px-3 text-gray-500 text-sm">или</span>
+                <div className="flex-grow h-px bg-gray-200"></div>
+              </div>
+
+              <Button 
+                className="w-full" 
+                onClick={handleStartScan}
+                disabled={!selectedStudentId}
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                Сканировать карту
+              </Button>
+            </>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Закрыть
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 // Add Student Panel Component
 const AddStudentPanel = ({ 
@@ -190,9 +329,17 @@ interface StudentsListProps {
   onAddStudent?: (student: Omit<Student, "id">) => void
   onDeleteStudent?: (studentId: string) => Promise<{canDelete: boolean, equipment?: string[]}>
   scannedCardId?: string
+  onBindCard?: (studentId: string, cardId: string) => void
 }
 
-export default function StudentsList({ students, onToggleAccess, onAddStudent, onDeleteStudent, scannedCardId }: StudentsListProps) {
+export default function StudentsList({ 
+  students, 
+  onToggleAccess, 
+  onAddStudent, 
+  onDeleteStudent, 
+  scannedCardId,
+  onBindCard
+}: StudentsListProps) {
   const [showMobileView, setShowMobileView] = useState(window.innerWidth < 768);
   const [filterAccess, setFilterAccess] = useState<'all' | 'granted' | 'denied'>('all');
   const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
@@ -207,6 +354,9 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
     name: '',
     equipment: []
   });
+
+  // Add new state for card binding dialog
+  const [cardBindingDialogOpen, setCardBindingDialogOpen] = useState(false);
 
   // Get unique groups from students
   const studentGroups = ['all', ...Array.from(new Set(students.map(student => student.group)))];
@@ -274,7 +424,14 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
     }
   };
 
-  // Mobile view
+  // Add handleBindCard function
+  const handleBindCard = (studentId: string, cardId: string) => {
+    if (onBindCard) {
+      onBindCard(studentId, cardId);
+    }
+  };
+
+  // Mobile view with added card binding
   if (showMobileView) {
     return (
       <div className="bg-white">
@@ -331,14 +488,26 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
                 Запрещен
               </Button>
             </div>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-blue-600 ml-2 h-9 w-9 p-0 flex items-center justify-center rounded-full focus:outline-none focus-visible:ring-0"
-              onClick={() => setIsAddPanelOpen(true)}
-            >
-              <UserPlus className="h-4 w-4" />
-            </Button>
+            <div className="flex gap-1">
+              {onBindCard && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-9 p-0 w-9 flex items-center justify-center rounded-full"
+                  onClick={() => setCardBindingDialogOpen(true)}
+                >
+                  <CreditCard className="h-4 w-4 text-blue-600" />
+                </Button>
+              )}
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-9 p-0 w-9 flex items-center justify-center rounded-full"
+                onClick={() => setIsAddPanelOpen(true)}
+              >
+                <UserPlus className="h-4 w-4 text-blue-600" />
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -395,6 +564,12 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
                     <div>
                       <h3 className="font-medium text-gray-900">{student.name}</h3>
                       <p className="text-sm text-gray-500">Группа: {student.group}</p>
+                      {student.card_id && (
+                        <p className="text-xs text-blue-600 flex items-center mt-1">
+                          <CreditCard className="h-3 w-3 mr-1" />
+                          Карта: {student.card_id}
+                        </p>
+                      )}
                     </div>
                   </div>
                   
@@ -410,16 +585,31 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
                       </span>
                     </div>
                     
-                    {onDeleteStudent && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
-                        onClick={() => handleDeleteClick(student)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {onBindCard && !student.card_id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
+                          onClick={() => {
+                            setSelectedStudentId?.(student.id);
+                            setCardBindingDialogOpen(true);
+                          }}
+                        >
+                          <CreditCard className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {onDeleteStudent && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                          onClick={() => handleDeleteClick(student)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -442,163 +632,184 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
           studentName={studentToDelete.name}
           equipmentList={studentToDelete.equipment}
         />
+
+        {/* Add card binding dialog */}
+        {onBindCard && (
+          <CardBindingDialog
+            isOpen={cardBindingDialogOpen}
+            onClose={() => setCardBindingDialogOpen(false)}
+            onBind={handleBindCard}
+            students={students}
+            scannedCardId={scannedCardId}
+          />
+        )}
       </div>
     );
   }
 
-  // Desktop view
+  // Desktop view with added card binding
   return (
     <div className="bg-white">
-      {scannedCardId && (
-        <div className="bg-blue-50 p-6 mb-4 border border-blue-100 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-blue-800">Последняя отсканированная карта</h3>
-              <p className="text-2xl font-bold text-blue-900 mt-1">{scannedCardId}</p>
-              <p className="text-sm text-blue-600 mt-1">Карта отсканирована и готова к верификации</p>
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2 items-center">
+            <div className="relative flex-1 max-w-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <Input
+                type="text"
+                placeholder="Поиск студентов..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-10 min-w-[300px]"
+              />
             </div>
-            <div className="bg-white p-4 rounded-full border border-blue-200">
-              <CreditCard className="h-10 w-10 text-blue-500" />
+            <div className="relative">
+              <Select value={groupFilter} onValueChange={setGroupFilter}>
+                <SelectTrigger className="flex items-center gap-1 h-10 w-auto min-w-[150px]">
+                  <Filter className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm">
+                    {groupFilter === 'all' ? 'Все группы' : `Группа: ${groupFilter}`}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все группы</SelectItem>
+                  {studentGroups.filter(g => g !== 'all').map(group => (
+                    <SelectItem key={group} value={group}>{group}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-        </div>
-      )}
-      <div className="border-b border-gray-200 p-4">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              variant={filterAccess === 'all' ? 'default' : 'outline'}
-              onClick={() => setFilterAccess('all')}
-              className="focus:outline-none focus-visible:ring-0"
-            >
-              Все студенты
-            </Button>
-            <Button 
-              size="sm" 
-              variant={filterAccess === 'granted' ? 'default' : 'outline'}
-              onClick={() => setFilterAccess('granted')}
-              className="bg-green-600 hover:bg-green-700 text-white focus:outline-none focus-visible:ring-0"
-            >
-              <CheckCircle className="mr-1 h-4 w-4" />
-              Доступ разрешен
-            </Button>
-            <Button 
-              size="sm" 
-              variant={filterAccess === 'denied' ? 'default' : 'outline'}
-              onClick={() => setFilterAccess('denied')}
-              className="bg-red-600 hover:bg-red-700 text-white focus:outline-none focus-visible:ring-0"
-            >
-              <XCircle className="mr-1 h-4 w-4" />
-              Доступ запрещен
-            </Button>
-          </div>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="text-blue-600 focus:outline-none focus-visible:ring-0"
-            onClick={() => setIsAddPanelOpen(true)}
-          >
-            <UserPlus className="mr-1 h-4 w-4" />
-            Добавить студента
-          </Button>
-        </div>
-
-        <div className="flex gap-4">
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="Поиск по ФИО студента..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-[300px]"
-            />
           </div>
           
-          <Select 
-            value={groupFilter} 
-            onValueChange={setGroupFilter}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Фильтр по группе" />
-            </SelectTrigger>
-            <SelectContent>
-              {studentGroups.map((group) => (
-                <SelectItem key={group} value={group}>
-                  {group === 'all' ? 'Все группы' : group}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setFilterAccess('all')}
+            >
+              Все
+            </Button>
+            <Button
+              variant={filterAccess === 'granted' ? "default" : "outline"}
+              className="gap-2"
+              onClick={() => setFilterAccess('granted')}
+            >
+              <CheckCircle className="h-4 w-4" />
+              С доступом
+            </Button>
+            <Button
+              variant={filterAccess === 'denied' ? "default" : "outline"}
+              className="gap-2"
+              onClick={() => setFilterAccess('denied')}
+            >
+              <XCircle className="h-4 w-4" />
+              Без доступа
+            </Button>
+            {onBindCard && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setCardBindingDialogOpen(true)}
+              >
+                <CreditCard className="h-4 w-4" />
+                Привязать карту
+              </Button>
+            )}
+            {onAddStudent && (
+              <Button
+                className="gap-2"
+                onClick={() => setIsAddPanelOpen(true)}
+              >
+                <UserPlus className="h-4 w-4" />
+                Добавить студента
+              </Button>
+            )}
+          </div>
         </div>
       </div>
-      {filteredStudents.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <Search className="h-8 w-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900">Студенты не найдены</h3>
-          <p className="mt-1 text-sm text-gray-500">Попробуйте изменить параметры поиска</p>
-        </div>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="bg-white">Имя</TableHead>
-              <TableHead className="bg-white">Группа</TableHead>
-              <TableHead className="bg-white">ID карты</TableHead>
-              <TableHead className="bg-white">Доступ</TableHead>
-              <TableHead className="bg-white text-right">Действия</TableHead>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="bg-white">Имя</TableHead>
+            <TableHead className="bg-white">Группа</TableHead>
+            <TableHead className="bg-white">ID карты</TableHead>
+            <TableHead className="bg-white">Доступ</TableHead>
+            <TableHead className="bg-white text-right">Действия</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredStudents.map((student) => (
+            <TableRow key={student.id}>
+              <TableCell className="font-medium">
+                <div className="flex items-center">
+                  <Avatar className="h-8 w-8 mr-2">
+                    <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(student.name)}`} />
+                  </Avatar>
+                  {student.name}
+                  {student.cardVerified && (
+                    <Badge className="ml-2 bg-blue-100 text-blue-800">ID проверен</Badge>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>{student.group}</TableCell>
+              <TableCell>
+                {student.card_id ? (
+                  <span className="text-blue-600 flex items-center">
+                    <CreditCard className="h-4 w-4 mr-1" />
+                    {student.card_id}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center">
+                  <Switch
+                    checked={student.hasAccess}
+                    onCheckedChange={() => onToggleAccess(student.id)}
+                    className={student.hasAccess ? "bg-green-600" : "bg-gray-200"}
+                  />
+                  <span className={`ml-2 ${student.hasAccess ? "text-green-600" : "text-gray-500"}`}>
+                    {student.hasAccess ? "Разрешен" : "Запрещен"}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end">
+                  {onBindCard && !student.card_id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
+                      title="Привязать карту"
+                      onClick={() => {
+                        setSelectedStudentId?.(student.id);
+                        setCardBindingDialogOpen(true);
+                      }}
+                    >
+                      <CreditCard className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {onDeleteStudent && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                      title="Удалить студента"
+                      onClick={() => handleDeleteClick(student)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredStudents.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center">
-                    <Avatar className="h-8 w-8 mr-2">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(student.name)}`} />
-                    </Avatar>
-                    {student.name}
-                    {student.cardVerified && (
-                      <Badge className="ml-2 bg-blue-100 text-blue-800">ID проверен</Badge>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>{student.group}</TableCell>
-                <TableCell>{student.card_id || "—"}</TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <Switch
-                      checked={student.hasAccess}
-                      onCheckedChange={() => onToggleAccess(student.id)}
-                      className={student.hasAccess ? "bg-green-600" : "bg-gray-200"}
-                    />
-                    <span className={`ml-2 ${student.hasAccess ? "text-green-600" : "text-gray-500"}`}>
-                      {student.hasAccess ? "Разрешен" : "Запрещен"}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end">
-                    {onDeleteStudent && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
-                        title="Удалить студента"
-                        onClick={() => handleDeleteClick(student)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+          ))}
+        </TableBody>
+      </Table>
 
       {isAddPanelOpen && (
         <AddStudentPanel
@@ -606,7 +817,7 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
           onAddStudent={handleAddStudent}
         />
       )}
-
+      
       {/* Add delete confirmation dialog */}
       <DeleteConfirmDialog
         isOpen={deleteDialogOpen}
@@ -615,6 +826,17 @@ export default function StudentsList({ students, onToggleAccess, onAddStudent, o
         studentName={studentToDelete.name}
         equipmentList={studentToDelete.equipment}
       />
+
+      {/* Add card binding dialog */}
+      {onBindCard && (
+        <CardBindingDialog
+          isOpen={cardBindingDialogOpen}
+          onClose={() => setCardBindingDialogOpen(false)}
+          onBind={handleBindCard}
+          students={students}
+          scannedCardId={scannedCardId}
+        />
+      )}
     </div>
   );
 }

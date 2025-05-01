@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { 
   getUserById, 
   updateUser,
@@ -8,40 +8,27 @@ import {
   deleteUser
 } from '../../../../utils/userService';
 import { mapUserToStudent, mapEquipmentToFrontend } from '../../../../lib/api';
+import { supabase } from '../../../../utils/supabase';
 
 // GET /api/users/[id] - get user by ID
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  
   try {
-    const userId = parseInt(id);
-    if (isNaN(userId)) {
-      return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', params.id)
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const includeEquipment = searchParams.get('equipment') === 'true';
-    
-    const user = await getUserById(userId);
-    const mappedUser = mapUserToStudent(user);
-    
-    if (includeEquipment) {
-      const equipment = await getUserEquipment(userId);
-      const mappedEquipment = equipment.map(mapEquipmentToFrontend);
-      
-      return NextResponse.json({
-        user: mappedUser,
-        equipment: mappedEquipment
-      });
-    }
-    
-    return NextResponse.json(mappedUser);
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
+    return NextResponse.json(data);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
@@ -80,90 +67,107 @@ export async function PATCH(
 
 // POST /api/users/[id]/access - grant or revoke access
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
+  const action = request.nextUrl.searchParams.get('action');
   
   try {
-    const userId = parseInt(id);
-    if (isNaN(userId)) {
-      return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
-    }
+    if (action === 'grant' || action === 'revoke') {
+      const hasAccess = action === 'grant';
+      const { data, error } = await supabase
+        .from('users')
+        .update({ hasAccess })
+        .eq('id', params.id)
+        .select()
+        .single();
 
-    const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
-    
-    if (action === 'grant') {
-      const updatedUser = await grantAccess(userId);
-      const mappedUser = mapUserToStudent(updatedUser);
-      return NextResponse.json(mappedUser);
-    } else if (action === 'revoke') {
-      const updatedUser = await revokeAccess(userId);
-      const mappedUser = mapUserToStudent(updatedUser);
-      return NextResponse.json(mappedUser);
-    } else {
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json(data);
+    } 
+    else if (action === 'bindCard') {
+      // Handle binding card to student
+      const body = await request.json();
+      const { cardId } = body;
+
+      if (!cardId) {
+        return NextResponse.json({ error: 'Card ID is required' }, { status: 400 });
+      }
+
+      // Check if the card is already bound to another student
+      const { data: existingCard, error: checkError } = await supabase
+        .from('users')
+        .select('id, name')
+        .eq('card_id', cardId)
+        .single();
+
+      if (existingCard && existingCard.id !== params.id) {
+        return NextResponse.json({ 
+          error: `Карта уже связана со студентом ${existingCard.name}` 
+        }, { status: 400 });
+      }
+
+      // Bind card to the student
+      const { data, error } = await supabase
+        .from('users')
+        .update({ card_id: cardId })
+        .eq('id', params.id)
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json(data);
+    }
+    else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-  } catch (error) {
-    console.error('Error with user access:', error);
-    return NextResponse.json({ error: 'Failed to update user access' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 // DELETE /api/users/[id] - delete a user
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  
   try {
-    const userId = parseInt(id);
-    
-    if (isNaN(userId)) {
-      return NextResponse.json(
-        { error: 'Invalid user ID' },
-        { status: 400 }
-      );
+    // First check if user has any equipment checked out
+    const { data: equipment, error: equipmentError } = await supabase
+      .from('equipment')
+      .select('id, name')
+      .eq('checkedOutBy', params.id);
+
+    if (equipmentError) {
+      return NextResponse.json({ error: equipmentError.message }, { status: 500 });
     }
-    
-    // Check if user exists
-    let user;
-    try {
-      user = await getUserById(userId);
-    } catch (error) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-    
-    // First, check if the user has any equipment checked out
-    const equipment = await getUserEquipment(userId);
-    
+
+    // If user has equipment checked out, prevent deletion
     if (equipment && equipment.length > 0) {
-      return NextResponse.json(
-        { 
-          error: 'Cannot delete user who has equipment checked out',
-          equipment: equipment.map(item => ({
-            id: item.id,
-            name: item.name
-          }))
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ 
+        error: 'Cannot delete user with equipment checked out',
+        equipment
+      }, { status: 400 });
     }
-    
-    await deleteUser(userId);
-    
+
+    // Delete the user
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', params.id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Error deleting user:', error);
-    
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete user' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 } 
