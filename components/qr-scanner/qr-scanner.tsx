@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { X, Upload, Camera } from 'lucide-react';
+import { X, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface QRScannerProps {
   onScan: (data: string) => void;
@@ -12,8 +11,6 @@ interface QRScannerProps {
 const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannerInitialized, setScannerInitialized] = useState(false);
-  const [scanMode, setScanMode] = useState<'camera' | 'upload'>('camera');
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [deviceIsMobile, setDeviceIsMobile] = useState<boolean>(false);
   const [useSimpleConstraints, setUseSimpleConstraints] = useState(false);
 
@@ -184,53 +181,6 @@ const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          
-          canvas.width = img.width;
-          canvas.height = img.height;
-          
-          if (context) {
-            context.drawImage(img, 0, 0, img.width, img.height);
-            
-            // Here should be a call to a library for QR code recognition from the image
-            // In this implementation, we simply show the user an error message
-            
-            alert('Обработка QR-кода из файла не реализована');
-            // Reset input file value so you can upload the same file again
-            if (fileInputRef.current) fileInputRef.current.value = '';
-          }
-        } catch (error) {
-          console.error('Error processing image:', error);
-          alert('Ошибка при обработке изображения');
-          if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-      };
-      img.src = event.target?.result as string;
-    };
-    
-    reader.readAsDataURL(file);
-  };
-  
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
-  };
-  
-  // For debugging - simulate a successful QR scan
-  const simulateScan = () => {
-    console.log("Simulating QR scan");
-    onScan("DEMO-QR-CODE-123");
-  };
-
   const renderScanner = () => {
     if (scannerError) {
       return (
@@ -300,14 +250,6 @@ const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
         <div className="absolute bottom-2 left-2 right-2 bg-white bg-opacity-75 p-2 rounded-lg text-xs text-center">
           <p>Направьте камеру на QR-код оборудования и держите устройство неподвижно</p>
         </div>
-        
-        {/* Debugging button to simulate a scan */}
-        <Button
-          onClick={simulateScan}
-          className="absolute top-2 right-2 bg-green-500 text-white p-1 text-xs rounded"
-        >
-          ТЕСТ: Симулировать скан
-        </Button>
       </div>
     );
   };
@@ -325,52 +267,16 @@ const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
         </Button>
       </div>
       
-      <Tabs defaultValue="camera" onValueChange={(val) => setScanMode(val as 'camera' | 'upload')}>
-        <TabsList className="w-full mb-4">
-          <TabsTrigger value="camera" className="flex-1">
-            <Camera className="mr-2 h-4 w-4" />
-            Камера
-          </TabsTrigger>
-          <TabsTrigger value="upload" className="flex-1">
-            <Upload className="mr-2 h-4 w-4" />
-            Загрузить файл
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="camera">
-          {renderScanner()}
-        </TabsContent>
-        
-        <TabsContent value="upload">
-          <div className="space-y-4">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <input 
-                type="file" 
-                accept="image/*" 
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                className="hidden" 
-              />
-              <Upload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 mb-2">Загрузите изображение с QR-кодом</p>
-              <Button 
-                onClick={triggerFileUpload}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                Выбрать файл
-              </Button>
-            </div>
-            <p className="text-center text-xs text-gray-500">
-              Поддерживаемые форматы: JPG, PNG, GIF
-            </p>
-          </div>
-        </TabsContent>
-      </Tabs>
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Camera className="h-5 w-5 text-blue-600" />
+          <h3 className="text-lg font-medium">Сканер камеры</h3>
+        </div>
+        {renderScanner()}
+      </div>
       
       <div className="mt-4 text-center text-sm text-gray-500">
-        {scanMode === 'camera' 
-          ? 'Наведите камеру на QR-код оборудования' 
-          : 'Выберите файл с изображением QR-кода'}
+        Наведите камеру на QR-код оборудования
       </div>
       
       <Button
