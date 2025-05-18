@@ -77,7 +77,7 @@ export async function POST(
       const hasAccess = action === 'grant';
       const { data, error } = await supabase
         .from('users')
-        .update({ hasAccess })
+        .update({ has_access: hasAccess })
         .eq('id', params.id)
         .select()
         .single();
@@ -86,7 +86,9 @@ export async function POST(
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      return NextResponse.json(data);
+      // Map DB response to frontend format
+      const mappedStudent = mapUserToStudent(data);
+      return NextResponse.json(mappedStudent);
     } 
     else if (action === 'bindCard') {
       // Handle binding card to student
@@ -122,7 +124,9 @@ export async function POST(
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      return NextResponse.json(data);
+      // Map DB response to frontend format
+      const mappedStudent = mapUserToStudent(data);
+      return NextResponse.json(mappedStudent);
     }
     else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
@@ -142,7 +146,7 @@ export async function DELETE(
     const { data: equipment, error: equipmentError } = await supabase
       .from('equipment')
       .select('id, name')
-      .eq('checkedOutBy', params.id);
+      .eq('checked_out_by', params.id);
 
     if (equipmentError) {
       return NextResponse.json({ error: equipmentError.message }, { status: 500 });

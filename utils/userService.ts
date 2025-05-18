@@ -154,7 +154,7 @@ export async function getUserEquipment(userId: number) {
   }
   
   return data;
-}
+} 
 
 /**
  * Delete a user by ID

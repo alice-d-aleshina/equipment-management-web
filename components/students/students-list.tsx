@@ -27,25 +27,27 @@ const CardBindingDialog = ({
   onBind,
   students,
   scannedCardId,
+  preselectedStudentId,
 }: { 
   isOpen: boolean;
   onClose: () => void;
   onBind: (studentId: string, cardId: string) => void;
   students: Student[];
   scannedCardId?: string;
+  preselectedStudentId?: string;
 }) => {
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [isWaitingForScan, setIsWaitingForScan] = useState(false);
   const [manualCardId, setManualCardId] = useState("");
 
-  // Reset state when dialog opens
+  // Reset state when dialog opens and set preselected student if provided
   useEffect(() => {
     if (isOpen) {
-      setSelectedStudentId("");
+      setSelectedStudentId(preselectedStudentId || "");
       setIsWaitingForScan(false);
       setManualCardId("");
     }
-  }, [isOpen]);
+  }, [isOpen, preselectedStudentId]);
 
   // When a card is scanned while waiting for scan, bind it
   useEffect(() => {
@@ -357,6 +359,8 @@ export default function StudentsList({
 
   // Add new state for card binding dialog
   const [cardBindingDialogOpen, setCardBindingDialogOpen] = useState(false);
+  // Add missing selectedStudentId state
+  const [selectedStudentId, setSelectedStudentId] = useState('');
 
   // Get unique groups from students
   const studentGroups = ['all', ...Array.from(new Set(students.map(student => student.group)))];
@@ -419,8 +423,9 @@ export default function StudentsList({
         });
         setDeleteDialogOpen(true);
       }
+      // If student was successfully deleted, the UI is already updated by the parent component
     } catch (error) {
-      console.error("Error checking student equipment:", error);
+      console.error("Error deleting student:", error);
     }
   };
 
@@ -592,7 +597,7 @@ export default function StudentsList({
                           size="sm"
                           className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
                           onClick={() => {
-                            setSelectedStudentId?.(student.id);
+                            setSelectedStudentId(student.id);
                             setCardBindingDialogOpen(true);
                           }}
                         >
@@ -641,6 +646,7 @@ export default function StudentsList({
             onBind={handleBindCard}
             students={students}
             scannedCardId={scannedCardId}
+            preselectedStudentId={selectedStudentId}
           />
         )}
       </div>
@@ -786,7 +792,7 @@ export default function StudentsList({
                       className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
                       title="Привязать карту"
                       onClick={() => {
-                        setSelectedStudentId?.(student.id);
+                        setSelectedStudentId(student.id);
                         setCardBindingDialogOpen(true);
                       }}
                     >
@@ -835,6 +841,7 @@ export default function StudentsList({
           onBind={handleBindCard}
           students={students}
           scannedCardId={scannedCardId}
+          preselectedStudentId={selectedStudentId}
         />
       )}
     </div>

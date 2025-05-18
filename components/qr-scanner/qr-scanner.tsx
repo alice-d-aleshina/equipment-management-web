@@ -272,8 +272,8 @@ const QRScanner = ({ onScan, onClose }: QRScannerProps) => {
           <Camera className="h-5 w-5 text-blue-600" />
           <h3 className="text-lg font-medium">Сканер камеры</h3>
         </div>
-        {renderScanner()}
-      </div>
+          {renderScanner()}
+          </div>
       
       <div className="mt-4 text-center text-sm text-gray-500">
         Наведите камеру на QR-код оборудования
