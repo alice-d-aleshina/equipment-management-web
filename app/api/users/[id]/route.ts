@@ -25,7 +25,7 @@ export async function GET(
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
+    
     return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -84,7 +84,7 @@ export async function POST(
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
-      }
+    }
 
       // Map DB response to frontend format
       const mappedStudent = mapUserToStudent(data);

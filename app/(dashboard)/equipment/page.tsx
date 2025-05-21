@@ -96,7 +96,7 @@ export default function EquipmentPage() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-4 mb-4 sm:mb-6">
+      <div className="flex flex-col gap-2 mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl font-bold">Управление оборудованием</h1>
       </div>
       

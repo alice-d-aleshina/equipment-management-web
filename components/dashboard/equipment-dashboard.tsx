@@ -734,7 +734,7 @@ export default function EquipmentDashboard() {
                   >
                     <div className="flex items-center justify-center">
                       <Users className="mr-2 h-5 w-5" />
-                      <span>Студенты и Доступы</span>
+                      <span>Студенты</span>
                     </div>
                   </Button>
                 </div>

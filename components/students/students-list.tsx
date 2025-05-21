@@ -493,6 +493,14 @@ export default function StudentsList({
                 Запрещен
               </Button>
             </div>
+            
+          </div>
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex gap-1 flex-1">
+              
+              
+              
+            </div>
             <div className="flex gap-1">
               {onBindCard && (
                 <Button 
@@ -504,14 +512,14 @@ export default function StudentsList({
                   <CreditCard className="h-4 w-4 text-blue-600" />
                 </Button>
               )}
-              <Button 
-                size="sm" 
-                variant="outline" 
+            <Button 
+              size="sm" 
+              variant="outline" 
                 className="h-9 p-0 w-9 flex items-center justify-center rounded-full"
-                onClick={() => setIsAddPanelOpen(true)}
-              >
+              onClick={() => setIsAddPanelOpen(true)}
+            >
                 <UserPlus className="h-4 w-4 text-blue-600" />
-              </Button>
+            </Button>
             </div>
           </div>
 
@@ -543,6 +551,11 @@ export default function StudentsList({
             </Select>
           </div>
         </div>
+        <div className="border-b border-gray-200 p-3">
+          
+
+          
+        </div>
         
         {filteredStudents.length === 0 ? (
           <div className="text-center py-8 px-4">
@@ -565,7 +578,7 @@ export default function StudentsList({
                   <div className="flex items-center mb-3">
                     <Avatar className="h-9 w-9 mr-3">
                       <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(student.name)}`} />
-                    </Avatar>
+                  </Avatar>
                     <div>
                       <h3 className="font-medium text-gray-900">{student.name}</h3>
                       <p className="text-sm text-gray-500">Группа: {student.group}</p>
@@ -576,7 +589,7 @@ export default function StudentsList({
                         </p>
                       )}
                     </div>
-                  </div>
+                      </div>
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -605,14 +618,14 @@ export default function StudentsList({
                         </Button>
                       )}
                       {onDeleteStudent && (
-                        <Button
+                      <Button
                           variant="ghost"
-                          size="sm"
+                        size="sm"
                           className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
                           onClick={() => handleDeleteClick(student)}
-                        >
+                      >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                      </Button>
                       )}
                     </div>
                   </div>
@@ -657,7 +670,7 @@ export default function StudentsList({
   return (
     <div className="bg-white">
       <div className="mb-4">
-        <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
           <div className="flex gap-2 items-center">
             <div className="relative flex-1 max-w-sm">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -690,14 +703,14 @@ export default function StudentsList({
           </div>
           
           <div className="flex gap-2">
-            <Button
+            <Button 
               variant="outline"
               className="gap-2"
               onClick={() => setFilterAccess('all')}
             >
               Все
             </Button>
-            <Button
+            <Button 
               variant={filterAccess === 'granted' ? "default" : "outline"}
               className="gap-2"
               onClick={() => setFilterAccess('granted')}
@@ -705,7 +718,7 @@ export default function StudentsList({
               <CheckCircle className="h-4 w-4" />
               С доступом
             </Button>
-            <Button
+            <Button 
               variant={filterAccess === 'denied' ? "default" : "outline"}
               className="gap-2"
               onClick={() => setFilterAccess('denied')}
@@ -713,9 +726,19 @@ export default function StudentsList({
               <XCircle className="h-4 w-4" />
               Без доступа
             </Button>
+            
+          </div>
+        </div>
+      </div>
+      <div className="mb-4">
+          <div className="flex items-center justify-between">
+          
+          
+          <div className="flex gap-2">
+           
             {onBindCard && (
-              <Button
-                variant="outline"
+          <Button 
+            variant="outline" 
                 className="gap-2"
                 onClick={() => setCardBindingDialogOpen(true)}
               >
@@ -726,29 +749,29 @@ export default function StudentsList({
             {onAddStudent && (
               <Button
                 className="gap-2"
-                onClick={() => setIsAddPanelOpen(true)}
-              >
+            onClick={() => setIsAddPanelOpen(true)}
+          >
                 <UserPlus className="h-4 w-4" />
-                Добавить студента
-              </Button>
+            Добавить студента
+          </Button>
             )}
           </div>
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
+        <Table>
+          <TableHeader>
+            <TableRow>
             <TableHead className="bg-white">Имя</TableHead>
             <TableHead className="bg-white">Группа</TableHead>
             <TableHead className="bg-white">ID карты</TableHead>
             <TableHead className="bg-white">Доступ</TableHead>
             <TableHead className="bg-white text-right">Действия</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredStudents.map((student) => (
-            <TableRow key={student.id}>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredStudents.map((student) => (
+              <TableRow key={student.id}>
               <TableCell className="font-medium">
                 <div className="flex items-center">
                   <Avatar className="h-8 w-8 mr-2">
@@ -759,8 +782,8 @@ export default function StudentsList({
                     <Badge className="ml-2 bg-blue-100 text-blue-800">ID проверен</Badge>
                   )}
                 </div>
-              </TableCell>
-              <TableCell>{student.group}</TableCell>
+                </TableCell>
+                <TableCell>{student.group}</TableCell>
               <TableCell>
                 {student.card_id ? (
                   <span className="text-blue-600 flex items-center">
@@ -770,7 +793,7 @@ export default function StudentsList({
                 ) : (
                   <span className="text-gray-400">—</span>
                 )}
-              </TableCell>
+                </TableCell>
               <TableCell>
                 <div className="flex items-center">
                   <Switch
@@ -782,7 +805,7 @@ export default function StudentsList({
                     {student.hasAccess ? "Разрешен" : "Запрещен"}
                   </span>
                 </div>
-              </TableCell>
+                </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end">
                   {onBindCard && !student.card_id && (
@@ -800,22 +823,22 @@ export default function StudentsList({
                     </Button>
                   )}
                   {onDeleteStudent && (
-                    <Button
+                  <Button
                       variant="ghost"
-                      size="sm"
+                    size="sm"
                       className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
                       title="Удалить студента"
                       onClick={() => handleDeleteClick(student)}
-                    >
+                  >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                  </Button>
                   )}
                 </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
 
       {isAddPanelOpen && (
         <AddStudentPanel
