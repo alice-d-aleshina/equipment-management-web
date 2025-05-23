@@ -36,6 +36,7 @@ export const mapUserToStudent = (user: any): Student => {
     hasAccess: user.has_access || false,
     email: user.email || '',
     phone: user.phone || '',
+    card_id: user.card_id || undefined,
   };
 };
 

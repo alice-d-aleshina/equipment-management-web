@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server';
+import CardReaderClient from '../../../../lib/services/card-reader-client';
+import { ARDUINO_CONFIG } from '../../../../lib/config/arduino-config';
 
-// Shared state for the card reader connection
-// In a real application, this would be part of a proper state management system
-let readerState = {
-  connected: false,
-  status: 'Disconnected',
-  cardPresent: false,
-  cardId: '',
-  cardType: '',
-  uptime: 0,
-  lastConnectTime: null,
-  port: null,
-  parser: null
-};
+// Get card reader client instance
+function getCardReaderClient() {
+  return new CardReaderClient({
+    serverUrl: ARDUINO_CONFIG.SERVER_URL
+  });
+}
 
 /**
  * POST /api/card-reader/connect
@@ -30,23 +25,34 @@ export async function POST(request) {
       );
     }
 
-    // In production, you would establish a real connection using SerialPort
-    // Here we simulate connecting
     console.log(`Connecting to Arduino on port: ${port}`);
     
-    // For now, we're just updating the state to simulate a connection
-    readerState = {
-      ...readerState,
-      connected: true,
-      status: `Connected to ${port}`,
-      lastConnectTime: new Date(),
-      uptime: 0
-    };
+    const client = getCardReaderClient();
     
-    return NextResponse.json({
-      connected: true,
-      status: readerState.status
-    });
+    // Check if Arduino server is available
+    const isAvailable = await client.isServerAvailable();
+    if (!isAvailable) {
+      return NextResponse.json(
+        { 
+          error: `Arduino card reader server is not available at ${ARDUINO_CONFIG.SERVER_URL}. Please ensure the arduino-card-reader server is running on port ${ARDUINO_CONFIG.SERVER_PORT}.`,
+          serverAvailable: false,
+          serverUrl: ARDUINO_CONFIG.SERVER_URL
+        },
+        { status: 503 }
+      );
+    }
+    
+    // Connect to the specified port
+    const result = await client.connect(port);
+    
+    if (result.success) {
+      return NextResponse.json(result.data);
+    } else {
+      return NextResponse.json(
+        { error: `Failed to connect: ${result.error}` },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error connecting to card reader:', error);
     return NextResponse.json(
@@ -54,7 +60,4 @@ export async function POST(request) {
       { status: 500 }
     );
   }
-}
-
-// Export the reader state for use in other route handlers
-export { readerState }; 
+} 

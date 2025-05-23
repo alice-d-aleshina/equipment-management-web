@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
-import { readerState } from '../connect/route';
+import CardReaderClient from '../../../../lib/services/card-reader-client';
+import { ARDUINO_CONFIG } from '../../../../lib/config/arduino-config';
+
+// Get card reader client instance
+function getCardReaderClient() {
+  return new CardReaderClient({
+    serverUrl: ARDUINO_CONFIG.SERVER_URL
+  });
+}
 
 /**
  * GET /api/card-reader/status
@@ -10,15 +18,23 @@ import { readerState } from '../connect/route';
  */
 export async function GET(request) {
   try {
-    // If connected, update uptime
-    if (readerState.connected && readerState.lastConnectTime) {
-      const now = new Date();
-      const uptimeMs = now - readerState.lastConnectTime;
-      readerState.uptime = Math.floor(uptimeMs / 1000);
+    const client = getCardReaderClient();
+    const result = await client.getStatus();
+    
+    if (result.success) {
+      console.log('Card reader status:', result.data);
+      return NextResponse.json(result.data);
+    } else {
+      // Return fallback data when Arduino server is unavailable
+      console.log('Arduino server unavailable, returning fallback status');
+      return NextResponse.json(result.data, { 
+        status: 200,
+        headers: {
+          'X-Arduino-Server-Status': 'unavailable',
+          'X-Fallback-Mode': 'true'
+        }
+      });
     }
-
-    console.log('Current reader status:', readerState);
-    return NextResponse.json(readerState);
   } catch (error) {
     console.error('Error getting card reader status:', error);
     return NextResponse.json(

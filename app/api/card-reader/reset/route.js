@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
-import { readerState } from '../connect/route';
+import CardReaderClient from '../../../../lib/services/card-reader-client';
+import { ARDUINO_CONFIG } from '../../../../lib/config/arduino-config';
+
+// Get card reader client instance
+function getCardReaderClient() {
+  return new CardReaderClient({
+    serverUrl: ARDUINO_CONFIG.SERVER_URL
+  });
+}
 
 /**
  * POST /api/card-reader/reset
@@ -10,27 +18,31 @@ import { readerState } from '../connect/route';
  */
 export async function POST(request) {
   try {
-    // Only allow reset if connected
-    if (!readerState.connected) {
+    const client = getCardReaderClient();
+    
+    // Check if Arduino server is available
+    const isAvailable = await client.isServerAvailable();
+    if (!isAvailable) {
       return NextResponse.json(
-        { error: 'Card reader is not connected' },
-        { status: 400 }
+        { 
+          error: 'Arduino card reader server is not available',
+          serverAvailable: false
+        },
+        { status: 503 }
       );
     }
-
-    // In production, you would send a reset command to the Arduino
-    console.log('Sending reset command to Arduino');
     
-    // Update the reader state - maintain connection but reset card
-    readerState.status = 'Connected - Reset complete';
-    readerState.cardPresent = false;
-    readerState.cardId = '';
-    readerState.cardType = '';
+    // Reset the card reader
+    const result = await client.reset();
     
-    return NextResponse.json({
-      success: true,
-      status: readerState.status
-    });
+    if (result.success) {
+      return NextResponse.json(result.data);
+    } else {
+      return NextResponse.json(
+        { error: `Failed to reset: ${result.error}` },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error resetting card reader:', error);
     return NextResponse.json(

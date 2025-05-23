@@ -10,8 +10,8 @@ function getCardReaderClient() {
 }
 
 /**
- * POST /api/card-reader/disconnect
- * Disconnect from the card reader
+ * POST /api/card-reader/request-uid
+ * Request card UID from the Arduino reader
  */
 export async function POST(request) {
   try {
@@ -29,21 +29,21 @@ export async function POST(request) {
       );
     }
     
-    // Disconnect from the card reader
-    const result = await client.disconnect();
+    // Request UID from the card reader
+    const result = await client.requestUID();
     
     if (result.success) {
       return NextResponse.json(result.data);
     } else {
       return NextResponse.json(
-        { error: `Failed to disconnect: ${result.error}` },
+        { error: `Failed to request UID: ${result.error}` },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('Error disconnecting from card reader:', error);
+    console.error('Error requesting card UID:', error);
     return NextResponse.json(
-      { error: `Failed to disconnect from card reader: ${error.message}` },
+      { error: `Failed to request card UID: ${error.message}` },
       { status: 500 }
     );
   }

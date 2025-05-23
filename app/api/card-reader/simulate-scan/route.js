@@ -1,17 +1,31 @@
 import { NextResponse } from 'next/server';
-import { readerState } from '../connect/route';
+import CardReaderClient from '../../../../lib/services/card-reader-client';
+import { ARDUINO_CONFIG } from '../../../../lib/config/arduino-config';
 
-// Card types based on ID patterns
-const detectCardType = (cardId) => {
-  if (!cardId) return 'Unknown';
+// Get card reader client instance
+function getCardReaderClient() {
+  return new CardReaderClient({
+    serverUrl: ARDUINO_CONFIG.SERVER_URL
+  });
+}
+
+// Helper function to detect card type (copied from arduino-card-reader.js)
+function detectCardType(cardId) {
+  if (!cardId) return 'Unknown Card';
   
-  // Simple pattern matching for demo purposes
-  if (cardId.startsWith('04')) return 'Student Card';
-  if (cardId.startsWith('F1')) return 'Faculty Card';
-  if (cardId.startsWith('7B')) return 'Guest Card';
+  cardId = cardId.toUpperCase();
   
-  return 'Unknown Card';
-};
+  // Extended rules for determining card type
+  if (cardId.startsWith('04')) return 'MIFARE 1K Student Card';
+  if (cardId.startsWith('A6')) return 'MIFARE 1K Standard';
+  if (cardId.startsWith('F1')) return 'MIFARE Faculty Card';
+  if (cardId.startsWith('7B')) return 'MIFARE Guest Card';
+  if (cardId.length === 8) return 'MIFARE 1K Standard';
+  if (cardId.length === 14) return 'MIFARE Ultralight';
+  if (cardId.length === 20) return 'MIFARE DESFire';
+  
+  return 'Unknown Card Type';
+}
 
 /**
  * POST /api/card-reader/simulate-scan
@@ -30,30 +44,50 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-    
-    // Only allow if connected
-    if (!readerState.connected) {
-      return NextResponse.json(
-        { error: 'Card reader is not connected' },
-        { status: 400 }
-      );
-    }
 
     console.log(`Simulating card scan with ID: ${cardId}`);
     
-    // Update the reader state
-    const cardType = detectCardType(cardId);
-    readerState.status = `Card detected: ${cardId}`;
-    readerState.cardPresent = true;
-    readerState.cardId = cardId;
-    readerState.cardType = cardType;
+    const client = getCardReaderClient();
     
-    return NextResponse.json({
-      success: true,
-      cardId: cardId,
-      cardType: cardType,
-      timestamp: new Date().toISOString()
-    });
+    // Check if Arduino server is available
+    const isAvailable = await client.isServerAvailable();
+    if (!isAvailable) {
+      // If Arduino server is not available, simulate locally
+      console.log('Arduino server unavailable, simulating locally');
+      const cardType = detectCardType(cardId);
+      
+      return NextResponse.json({
+        success: true,
+        cardId: cardId.toUpperCase(),
+        cardType: cardType,
+        timestamp: new Date().toISOString(),
+        simulated: true,
+        serverAvailable: false
+      });
+    }
+    
+    // Use Arduino server for simulation
+    const result = await client.simulateScan(cardId);
+    
+    if (result.success) {
+      return NextResponse.json({
+        ...result.data,
+        serverAvailable: true
+      });
+    } else {
+      // Fallback to local simulation if server simulation fails
+      const cardType = detectCardType(cardId);
+      
+      return NextResponse.json({
+        success: true,
+        cardId: cardId.toUpperCase(),
+        cardType: cardType,
+        timestamp: new Date().toISOString(),
+        simulated: true,
+        serverAvailable: false,
+        error: result.error
+      });
+    }
   } catch (error) {
     console.error('Error simulating card scan:', error);
     return NextResponse.json(

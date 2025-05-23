@@ -15,11 +15,13 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const { id } = await params;
+  
   try {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error) {
@@ -70,6 +72,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const { id } = await params;
   const action = request.nextUrl.searchParams.get('action');
   
   try {
@@ -78,7 +81,7 @@ export async function POST(
       const { data, error } = await supabase
         .from('users')
         .update({ has_access: hasAccess })
-        .eq('id', params.id)
+        .eq('id', id)
         .select()
         .single();
 
@@ -95,32 +98,76 @@ export async function POST(
       const body = await request.json();
       const { cardId } = body;
 
-      if (!cardId) {
+      // If cardId is null or undefined, unbind the card
+      if (cardId === null || cardId === undefined) {
+        const { data, error } = await supabase
+          .from('users')
+          .update({ card_id: null })
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error unbinding card:', error);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        const mappedStudent = mapUserToStudent(data);
+        return NextResponse.json(mappedStudent);
+      }
+
+      // If cardId is empty string, treat as error
+      if (!cardId || cardId.trim() === '') {
         return NextResponse.json({ error: 'Card ID is required' }, { status: 400 });
       }
 
       // Check if the card is already bound to another student
-      const { data: existingCard, error: checkError } = await supabase
+      // Use select without .single() to handle case where no records exist
+      const { data: existingCards, error: checkError } = await supabase
         .from('users')
         .select('id, name')
-        .eq('card_id', cardId)
-        .single();
+        .eq('card_id', cardId);
 
-      if (existingCard && existingCard.id !== params.id) {
+      if (checkError) {
+        console.error('Error checking existing card:', checkError);
+        return NextResponse.json({ error: 'Failed to check card binding' }, { status: 500 });
+      }
+
+      // Check if card is bound to a different user
+      const existingCard = existingCards && existingCards.length > 0 ? existingCards[0] : null;
+      if (existingCard && existingCard.id !== parseInt(id)) {
         return NextResponse.json({ 
           error: `Карта уже связана со студентом ${existingCard.name}` 
         }, { status: 400 });
       }
 
-      // Bind card to the student
+      // If card is already bound to the same user, just return success
+      if (existingCard && existingCard.id === parseInt(id)) {
+        // Get the user data and return it
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (userError) {
+          return NextResponse.json({ error: userError.message }, { status: 500 });
+        }
+
+        const mappedStudent = mapUserToStudent(userData);
+        return NextResponse.json(mappedStudent);
+      }
+
+      // Bind card to the student (new binding)
       const { data, error } = await supabase
         .from('users')
         .update({ card_id: cardId })
-        .eq('id', params.id)
+        .eq('id', id)
         .select()
         .single();
 
       if (error) {
+        console.error('Error binding card:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
@@ -141,12 +188,14 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const { id } = await params;
+  
   try {
     // First check if user has any equipment checked out
     const { data: equipment, error: equipmentError } = await supabase
       .from('equipment')
       .select('id, name')
-      .eq('checked_out_by', params.id);
+      .eq('checked_out_by', id);
 
     if (equipmentError) {
       return NextResponse.json({ error: equipmentError.message }, { status: 500 });
@@ -164,7 +213,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('users')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

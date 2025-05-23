@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { io, Socket } from "socket.io-client"
 import { useNotifications } from "@/lib/context/NotificationContext"
-import { API_BASE_URL } from "@/lib/api-config"
+import { ARDUINO_CONFIG } from "@/lib/config/arduino-config"
 
 // Define interfaces for WebSocket data
 interface CardScanData {
@@ -285,8 +285,8 @@ export default function EquipmentDashboard() {
   // Connect to WebSocket server
   useEffect(() => {
     // Connect to the Arduino card reader server WebSocket
-    socketRef.current = io(API_BASE_URL);
-    console.log(`WebSocket connecting to ${API_BASE_URL}`);
+    socketRef.current = io(ARDUINO_CONFIG.WEBSOCKET_URL);
+    console.log(`WebSocket connecting to ${ARDUINO_CONFIG.WEBSOCKET_URL}`);
     
     // Listen for card scan events
     socketRef.current.on('connect', () => {
@@ -608,7 +608,7 @@ export default function EquipmentDashboard() {
           // If the API returned equipment details
           if (errorData.equipment && Array.isArray(errorData.equipment) && errorData.equipment.length > 0) {
             // Create a message with the list of equipment
-            const equipmentList = errorData.equipment.map(e => e.name);
+            const equipmentList = errorData.equipment.map((e: any) => e.name);
             addNotification(
               `Невозможно удалить ${studentName}. Сначала верните оборудование: ${equipmentList.join(', ')}`, 
               "error",
@@ -620,10 +620,10 @@ export default function EquipmentDashboard() {
             };
           } else {
             // Fallback to checking equipment locally
-            const checkedOutEquipment = equipment.filter(e => e.checkedOutBy === studentId);
+            const checkedOutEquipment = equipment.filter((e: Equipment) => e.checkedOutBy === studentId);
             
             if (checkedOutEquipment.length > 0) {
-              const equipmentList = checkedOutEquipment.map(e => e.name);
+              const equipmentList = checkedOutEquipment.map((e: Equipment) => e.name);
               addNotification(
                 `Невозможно удалить ${studentName}. Сначала верните оборудование: ${equipmentList.join(', ')}`, 
                 "error",
@@ -675,7 +675,28 @@ export default function EquipmentDashboard() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to bind card to student');
+        const errorData = await response.json();
+        
+        // Check if it's a card already bound error
+        if (response.status === 400 && errorData.error && errorData.error.includes('уже связана со студентом')) {
+          // Extract student name from error message
+          const match = errorData.error.match(/уже связана со студентом (.+)/);
+          const existingStudentName = match ? match[1] : 'другим студентом';
+          
+          addNotification(
+            `❌ Карта ${cardId} уже привязана к студенту "${existingStudentName}". Попробуйте отсканировать другую карту.`,
+            "error"
+          );
+        } else {
+          // Generic error
+          addNotification(
+            `❌ Ошибка при привязке карты: ${errorData.error || 'Неизвестная ошибка'}. Попробуйте другую карту.`,
+            "error"
+          );
+        }
+        setLastScannedCardId("");
+        console.error('Error binding card to student:', errorData);
+        return;
       }
 
       const updatedStudent = await response.json();
@@ -688,11 +709,21 @@ export default function EquipmentDashboard() {
       const student = students.find((s) => s.id === studentId);
       
       if (student) {
-        addNotification(`Карта успешно привязана к студенту ${student.name}`, "success");
+        addNotification(
+          `✅ Карта ${cardId} успешно привязана к студенту ${student.name}`,
+          "success"
+        );
       }
+
+      // Clear the last scanned card ID after successful binding
+      setLastScannedCardId("");
     } catch (error) {
       console.error('Error binding card to student:', error);
-      addNotification("Ошибка при привязке карты к студенту", "error");
+      addNotification(
+        "❌ Произошла ошибка при привязке карты. Попробуйте отсканировать карту еще раз.",
+        "error"
+      );
+      setLastScannedCardId("");
     }
   }
 

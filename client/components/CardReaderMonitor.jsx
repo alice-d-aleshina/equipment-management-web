@@ -9,10 +9,6 @@ import { Badge } from "../../components/ui/badge";
 import { Separator } from "../../components/ui/separator";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { RotateCw, RefreshCw, Play, Square, Plug, Send } from 'lucide-react';
-import { API_BASE_URL, getApiUrl as getConfigApiUrl } from '@/lib/api-config';
-
-// Используем API_BASE_URL из конфигурации
-const ARDUINO_SERVER_URL = `${API_BASE_URL}/api`;
 
 const CardReaderMonitor = () => {
   const [connected, setConnected] = useState(false);
@@ -26,18 +22,15 @@ const CardReaderMonitor = () => {
   const [availablePorts, setAvailablePorts] = useState([]);
   const [selectedPort, setSelectedPort] = useState('');
   const [manualCardId, setManualCardId] = useState('');
-  const [useArduinoServer, setUseArduinoServer] = useState(false);
+  const [arduinoServerAvailable, setArduinoServerAvailable] = useState(false);
   
-  // Функция для использования правильного API в зависимости от режима
+  // Always use the Next.js API routes
   const getApiUrl = (endpoint) => {
-    return useArduinoServer 
-      ? `${ARDUINO_SERVER_URL}/${endpoint}` 
-      : `/api/card-reader/${endpoint}`;
+    return `/api/card-reader/${endpoint}`;
   };
 
   // Get initial status
   useEffect(() => {
-    checkArduinoServer();
     fetchStatus();
     fetchAvailablePorts();
     
@@ -47,21 +40,7 @@ const CardReaderMonitor = () => {
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [useArduinoServer]);
-
-  const checkArduinoServer = async () => {
-    try {
-      // Пробуем подключиться к Arduino серверу
-      const response = await axios.get(`${ARDUINO_SERVER_URL}/status`, { timeout: 1000 });
-      setUseArduinoServer(true);
-      addEvent('Connected to Arduino Server');
-      console.log('Using Arduino Server for card reading');
-    } catch (err) {
-      // Если сервер недоступен, используем симуляцию
-      setUseArduinoServer(false);
-      console.log('Arduino Server not available, using simulation');
-    }
-  };
+  }, []);
 
   const fetchStatus = async () => {
     try {
@@ -70,6 +49,10 @@ const CardReaderMonitor = () => {
       setStatus(response.data.status);
       setCardDetected(response.data.cardPresent || false);
       
+      // Check if we're getting data from Arduino server or fallback
+      const serverStatus = response.headers['x-arduino-server-status'];
+      setArduinoServerAvailable(serverStatus !== 'unavailable');
+      
       if (response.data.cardPresent) {
         setCardId(response.data.cardId || '');
         setCardType(response.data.cardType || '');
@@ -77,6 +60,7 @@ const CardReaderMonitor = () => {
     } catch (err) {
       console.error('Error fetching card reader status:', err);
       setError('Failed to fetch card reader status');
+      setArduinoServerAvailable(false);
     }
   };
 
@@ -108,7 +92,7 @@ const CardReaderMonitor = () => {
     return () => {
       if (cardPollInterval) clearInterval(cardPollInterval);
     };
-  }, [connected, useArduinoServer]);
+  }, [connected]);
 
   const fetchAvailablePorts = async () => {
     try {
@@ -118,6 +102,12 @@ const CardReaderMonitor = () => {
       // If we have a port and none is selected, select the first one
       if (response.data.length > 0 && !selectedPort) {
         setSelectedPort(response.data[0].path);
+      }
+      
+      // Check if we're getting data from Arduino server or fallback
+      const serverStatus = response.headers['x-arduino-server-status'];
+      if (serverStatus === 'unavailable') {
+        addEvent('Using fallback ports - Arduino server not available');
       }
     } catch (err) {
       console.error('Error fetching available ports:', err);
@@ -138,8 +128,15 @@ const CardReaderMonitor = () => {
       addEvent(`Connected to ${selectedPort}`);
     } catch (err) {
       console.error('Error connecting to card reader:', err);
-      setError('Failed to connect to card reader');
-      addEvent(`Connection failed: ${err.message || 'Unknown error'}`);
+      
+      // Handle 503 error specifically (Arduino server unavailable)
+      if (err.response?.status === 503) {
+        setError(`Arduino server not available: ${err.response.data.error}`);
+        addEvent(`Connection failed: Arduino server not available at ${err.response.data.serverUrl}`);
+      } else {
+        setError('Failed to connect to card reader');
+        addEvent(`Connection failed: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -180,21 +177,31 @@ const CardReaderMonitor = () => {
   };
 
   const simulateScan = async () => {
-    if (!manualCardId.trim()) {
-      setError('Please enter a card ID to simulate');
-      return;
-    }
+    if (!manualCardId.trim()) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      await axios.post(getApiUrl('simulate-scan'), { cardId: manualCardId });
-      addEvent(`Simulated scan for card ID: ${manualCardId}`);
-      setManualCardId('');
+      const response = await axios.post(getApiUrl('simulate-scan'), { 
+        cardId: manualCardId.trim() 
+      });
+      
+      if (response.data.success) {
+        setCardDetected(true);
+        setCardId(response.data.cardId);
+        setCardType(response.data.cardType);
+        
+        const serverMode = response.data.serverAvailable ? 'Arduino Server' : 'Local Simulation';
+        addEvent(`Card simulated (${serverMode}): ${response.data.cardId} (${response.data.cardType})`);
+        
+        // Clear the input
+        setManualCardId('');
+      }
     } catch (err) {
-      console.error('Error simulating card scan:', err);
+      console.error('Error simulating scan:', err);
       setError('Failed to simulate card scan');
+      addEvent(`Simulation failed: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -202,169 +209,184 @@ const CardReaderMonitor = () => {
 
   const addEvent = (message) => {
     const timestamp = new Date().toLocaleTimeString();
-    setEvents(prev => [{ timestamp, message }, ...prev].slice(0, 20));
+    setEvents(prev => [
+      { id: Date.now(), message, timestamp },
+      ...prev.slice(0, 49) // Keep last 50 events
+    ]);
   };
 
   return (
-    <div className="w-full space-y-4">
-      {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-4">
-          <div className="rounded-md border p-4">
-            <h3 className="text-lg font-medium mb-3">Reader Status</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Mode:</span>
-                <Badge variant="outline" className="bg-blue-50">
-                  {useArduinoServer ? 'Hardware (Arduino Server)' : 'Simulation'}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Connection:</span>
-                <Badge variant={connected ? "success" : "destructive"}>
-                  {connected ? 'Connected' : 'Disconnected'}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Status:</span>
-                <span className="text-sm">{status}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Card Present:</span>
-                <Badge variant={cardDetected ? "success" : "secondary"}>
-                  {cardDetected ? 'Yes' : 'No'}
-                </Badge>
-              </div>
-              {cardDetected && (
-                <>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Card ID:</span>
-                    <code className="bg-muted px-1 py-0.5 rounded text-sm">{cardId}</code>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Card Type:</span>
-                    <span className="text-sm">{cardType}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-          
-          <div className="rounded-md border p-4">
-            <h3 className="text-lg font-medium mb-3">Port Connection</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Select
-                  disabled={connected || loading}
-                  value={selectedPort}
-                  onValueChange={setSelectedPort}
-                >
-                  <SelectTrigger className="w-[260px]">
-                    <SelectValue placeholder="Select a port" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availablePorts.map((port) => (
-                      <SelectItem key={port.path} value={port.path}>
-                        {port.path} - {port.manufacturer || 'Unknown'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={fetchAvailablePorts}
-                  disabled={loading}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="default"
-                  onClick={connectToReader}
-                  disabled={!selectedPort || connected || loading}
-                >
-                  {loading ? (
-                    <RotateCw className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plug className="mr-2 h-4 w-4" />
-                  )}
-                  Connect
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={disconnectFromReader}
-                  disabled={!connected || loading}
-                >
-                  <Square className="mr-2 h-4 w-4" />
-                  Disconnect
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={resetReader}
-                  disabled={!connected || loading}
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Reset Reader
-                </Button>
-              </div>
-            </div>
-          </div>
-          
-          <div className="rounded-md border p-4">
-            <h3 className="text-lg font-medium mb-3">Simulate Card Scan</h3>
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Card ID (HEX) e.g. 1A2B3C4D"
-                value={manualCardId}
-                onChange={(e) => setManualCardId(e.target.value)}
-                disabled={!connected || loading}
-              />
-              <Button
-                onClick={simulateScan}
-                disabled={!connected || !manualCardId.trim() || loading}
-              >
-                <Send className="mr-2 h-4 w-4" />
-                Simulate
-              </Button>
-            </div>
+    <Card className="w-full max-w-6xl mx-auto">
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-semibold text-gray-900">Card Reader Monitor</h2>
+          <div className="flex items-center gap-2">
+            <Badge variant={arduinoServerAvailable ? "success" : "secondary"}>
+              {arduinoServerAvailable ? 'Arduino Server' : 'Fallback Mode'}
+            </Badge>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchStatus}
+              disabled={loading}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        
-        <div className="rounded-md border p-4">
-          <h3 className="text-lg font-medium mb-3">Event Log</h3>
-          <ScrollArea className="h-[400px] rounded-md border p-4">
-            {events.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                No events yet
-              </div>
-            ) : (
+
+        {error && (
+          <Alert className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <div className="rounded-md border p-4">
+              <h3 className="text-lg font-medium mb-3">Reader Status</h3>
               <div className="space-y-2">
-                {events.map((event, index) => (
-                  <div key={index} className="text-sm">
-                    <div className="font-medium">{event.message}</div>
-                    <div className="text-xs text-muted-foreground">{event.timestamp}</div>
-                    {index < events.length - 1 && <Separator className="my-2" />}
-                  </div>
-                ))}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Mode:</span>
+                  <Badge variant="outline" className="bg-blue-50">
+                    {arduinoServerAvailable ? 'Hardware (Arduino Server)' : 'Simulation'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Connection:</span>
+                  <Badge variant={connected ? "success" : "destructive"}>
+                    {connected ? 'Connected' : 'Disconnected'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Status:</span>
+                  <span className="text-sm">{status}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Card Present:</span>
+                  <Badge variant={cardDetected ? "success" : "secondary"}>
+                    {cardDetected ? 'Yes' : 'No'}
+                  </Badge>
+                </div>
+                {cardDetected && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Card ID:</span>
+                      <code className="bg-muted px-1 py-0.5 rounded text-sm">{cardId}</code>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Card Type:</span>
+                      <span className="text-sm">{cardType}</span>
+                    </div>
+                  </>
+                )}
               </div>
-            )}
-          </ScrollArea>
+            </div>
+            
+            <div className="rounded-md border p-4">
+              <h3 className="text-lg font-medium mb-3">Port Connection</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Select
+                    disabled={connected || loading}
+                    value={selectedPort}
+                    onValueChange={setSelectedPort}
+                  >
+                    <SelectTrigger className="w-[260px]">
+                      <SelectValue placeholder="Select a port" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePorts.map((port) => (
+                        <SelectItem key={port.path} value={port.path}>
+                          {port.path} - {port.manufacturer || 'Unknown'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={fetchAvailablePorts}
+                    disabled={loading}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    onClick={connectToReader}
+                    disabled={!selectedPort || connected || loading}
+                  >
+                    {loading ? (
+                      <RotateCw className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plug className="mr-2 h-4 w-4" />
+                    )}
+                    Connect
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={disconnectFromReader}
+                    disabled={!connected || loading}
+                  >
+                    <Square className="mr-2 h-4 w-4" />
+                    Disconnect
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={resetReader}
+                    disabled={!connected || loading}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Reset Reader
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="rounded-md border p-4">
+              <h3 className="text-lg font-medium mb-3">Simulate Card Scan</h3>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Card ID (HEX) e.g. 1A2B3C4D"
+                  value={manualCardId}
+                  onChange={(e) => setManualCardId(e.target.value)}
+                  disabled={loading}
+                />
+                <Button
+                  onClick={simulateScan}
+                  disabled={!manualCardId.trim() || loading}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Simulate
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="rounded-md border p-4">
+              <h3 className="text-lg font-medium mb-3">Event Log</h3>
+              <ScrollArea className="h-[400px] w-full">
+                <div className="space-y-2">
+                  {events.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No events logged yet</p>
+                  ) : (
+                    events.map((event) => (
+                      <div key={event.id} className="text-sm">
+                        <span className="text-muted-foreground">[{event.timestamp}]</span>
+                        <span className="ml-2">{event.message}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
         </div>
       </div>
-      
-      {loading && (
-        <div className="flex justify-center">
-          <RotateCw className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      )}
-    </div>
+    </Card>
   );
 };
 
