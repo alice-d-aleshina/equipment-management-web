@@ -20,6 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { io, Socket } from "socket.io-client"
 import { useNotifications } from "@/lib/context/NotificationContext"
 import { ARDUINO_CONFIG } from "@/lib/config/arduino-config"
+import { safeDecryptCardId, isEncryptedCardId } from "@/lib/utils/card-encryption"
 
 // Define interfaces for WebSocket data
 interface CardScanData {
@@ -300,11 +301,11 @@ export default function EquipmentDashboard() {
     });
     
     // Listen for card scan events
-    socketRef.current.on('card_scan', (data: CardScanData) => {
+    socketRef.current.on('card_scan', async (data: CardScanData) => {
       console.log('Card scanned:', data);
       if (data.cardId) {
-        setLastScannedCardId(data.cardId);
-        handleCardScan(data.cardId);
+        // Call the async handleCardScan function
+        await handleCardScan(data.cardId);
       }
     });
     
@@ -423,11 +424,32 @@ export default function EquipmentDashboard() {
     }
   }
 
-  // Modified handleCardScan to update lastScannedCardId
-  const handleCardScan = (cardId: string) => {
-    if (!cardId) return;
+  // Modified handleCardScan to update lastScannedCardId and decrypt card data
+  const handleCardScan = async (encryptedCardId: string) => {
+    if (!encryptedCardId) return;
     
-    console.log('Handling card scan for ID:', cardId);
+    console.log('Handling card scan for encrypted ID:', encryptedCardId);
+    
+    // Check if card ID is encrypted and decrypt it
+    let cardId: string;
+    if (isEncryptedCardId(encryptedCardId)) {
+      console.log('Card ID is encrypted, decrypting...');
+      addNotification("🔓 Расшифровка данных карты...", "info");
+      
+      try {
+        cardId = await safeDecryptCardId(encryptedCardId);
+        console.log('Card ID decrypted successfully:', cardId);
+        addNotification("✅ Данные карты расшифрованы успешно", "success");
+      } catch (error) {
+        console.error('Failed to decrypt card ID:', error);
+        addNotification("❌ Ошибка расшифровки данных карты", "error");
+        return;
+      }
+    } else {
+      cardId = encryptedCardId;
+      console.log('Card ID is not encrypted:', cardId);
+    }
+    
     setLastScannedCardId(cardId);
     
     // Форматируем ID карты для отображения
@@ -455,7 +477,28 @@ export default function EquipmentDashboard() {
     } else {
       // No matching student found
       console.log('No matching student found for card:', formattedCardId);
-      addNotification(`Карта не связана ни с одним студентом (ID: ${formattedCardId})`, "error");
+      
+      // Check if we're on the students tab and there are students available for binding
+      const studentsWithoutCards = students.filter(student => !student.card_id);
+      
+      if (activeTab === 'students' && studentsWithoutCards.length > 0) {
+        addNotification(
+          `🔗 Карта ${formattedCardId} не привязана. Нажмите "Привязать карту" для связи с студентом.`,
+          "info"
+        );
+      } else if (studentsWithoutCards.length > 0) {
+        // Switch to students tab and show message
+        setActiveTab('students');
+        addNotification(
+          `🔗 Карта ${formattedCardId} не привязана. Переключаемся на раздел "Студенты" для привязки.`,
+          "info"
+        );
+      } else {
+        addNotification(
+          `❌ Карта ${formattedCardId} не найдена. Все студенты уже имеют привязанные карты.`,
+          "info"
+        );
+      }
     }
   };
 

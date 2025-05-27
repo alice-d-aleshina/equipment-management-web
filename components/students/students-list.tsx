@@ -40,6 +40,9 @@ const CardBindingDialog = ({
   const [isWaitingForScan, setIsWaitingForScan] = useState(false);
   const [manualCardId, setManualCardId] = useState("");
 
+  // Filter students without cards
+  const studentsWithoutCards = students.filter(student => !student.card_id);
+
   // Reset state when dialog opens and set preselected student if provided
   useEffect(() => {
     if (isOpen) {
@@ -78,77 +81,90 @@ const CardBindingDialog = ({
             Привязка карты к студенту
           </DialogTitle>
           <DialogDescription>
-            Выберите студента и отсканируйте карту для привязки или введите ID карты вручную.
+            {studentsWithoutCards.length > 0 
+              ? "Выберите студента и отсканируйте карту для привязки или введите ID карты вручную."
+              : "Все студенты уже имеют привязанные карты."
+            }
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="student">Выберите студента</Label>
-            <Select 
-              value={selectedStudentId} 
-              onValueChange={setSelectedStudentId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Выберите студента" />
-              </SelectTrigger>
-              <SelectContent>
-                {students.map((student) => (
-                  <SelectItem key={student.id} value={student.id}>
-                    {student.name} ({student.group})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {isWaitingForScan ? (
-            <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded-md border border-blue-200 text-center">
-                <CreditCard className="h-12 w-12 mx-auto text-blue-500 mb-2" />
-                <p className="text-blue-700 font-medium">Ожидание сканирования карты...</p>
-                {scannedCardId && <p className="mt-2 text-green-600">Карта отсканирована: {scannedCardId}</p>}
-              </div>
-              <Button variant="outline" className="w-full" onClick={() => setIsWaitingForScan(false)}>
-                Отменить сканирование
-              </Button>
-            </div>
-          ) : (
+          {studentsWithoutCards.length > 0 ? (
             <>
               <div className="space-y-2">
-                <Label htmlFor="cardId">ID карты (вручную)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="cardId"
-                    value={manualCardId}
-                    onChange={(e) => setManualCardId(e.target.value)}
-                    placeholder="Введите ID карты вручную"
-                    className="flex-1"
-                  />
-                  <Button 
-                    variant="outline"
-                    onClick={handleManualBind}
-                    disabled={!selectedStudentId || !manualCardId}
-                  >
-                    Привязать
+                <Label htmlFor="student">Выберите студента</Label>
+                <Select 
+                  value={selectedStudentId} 
+                  onValueChange={setSelectedStudentId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите студента" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {studentsWithoutCards.map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.name} ({student.group})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {isWaitingForScan ? (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 p-4 rounded-md border border-blue-200 text-center">
+                    <CreditCard className="h-12 w-12 mx-auto text-blue-500 mb-2" />
+                    <p className="text-blue-700 font-medium">Ожидание сканирования карты...</p>
+                    {scannedCardId && <p className="mt-2 text-green-600">Карта отсканирована: {scannedCardId}</p>}
+                  </div>
+                  <Button variant="outline" className="w-full" onClick={() => setIsWaitingForScan(false)}>
+                    Отменить сканирование
                   </Button>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="cardId">ID карты (вручную)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="cardId"
+                        value={manualCardId}
+                        onChange={(e) => setManualCardId(e.target.value)}
+                        placeholder="Введите ID карты вручную"
+                        className="flex-1"
+                      />
+                      <Button 
+                        variant="outline"
+                        onClick={handleManualBind}
+                        disabled={!selectedStudentId || !manualCardId}
+                      >
+                        Привязать
+                      </Button>
+                    </div>
+                  </div>
 
-              <div className="flex items-center">
-                <div className="flex-grow h-px bg-gray-200"></div>
-                <span className="px-3 text-gray-500 text-sm">или</span>
-                <div className="flex-grow h-px bg-gray-200"></div>
-              </div>
+                  <div className="flex items-center">
+                    <div className="flex-grow h-px bg-gray-200"></div>
+                    <span className="px-3 text-gray-500 text-sm">или</span>
+                    <div className="flex-grow h-px bg-gray-200"></div>
+                  </div>
 
-              <Button 
-                className="w-full" 
-                onClick={handleStartScan}
-                disabled={!selectedStudentId}
-              >
-                <CreditCard className="mr-2 h-4 w-4" />
-                Сканировать карту
-              </Button>
+                  <Button 
+                    className="w-full" 
+                    onClick={handleStartScan}
+                    disabled={!selectedStudentId}
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Сканировать карту
+                  </Button>
+                </>
+              )}
             </>
+          ) : (
+            <div className="text-center py-6">
+              <CreditCard className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+              <p className="text-gray-600 mb-2">Нет доступных студентов</p>
+              <p className="text-sm text-gray-500">Все студенты уже имеют привязанные карты</p>
+            </div>
           )}
         </div>
         <DialogFooter>

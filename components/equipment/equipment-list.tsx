@@ -89,7 +89,17 @@ export default function EquipmentList({
   }, []);
 
   const filteredEquipment = equipment.filter(item => {
-    const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
+    let matchesStatus = false;
+    
+    if (filterStatus === 'all') {
+      matchesStatus = true;
+    } else if (filterStatus === 'in_use') {
+      // Для фильтра "Используется" показываем оборудование со статусами in_use и checked-out
+      matchesStatus = item.status === 'in_use' || item.status === 'checked-out';
+    } else {
+      matchesStatus = item.status === filterStatus;
+    }
+    
     const matchesSearch = searchQuery === '' || 
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
       item.nameEn.toLowerCase().includes(searchQuery.toLowerCase());
